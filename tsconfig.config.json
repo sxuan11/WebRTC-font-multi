@@ -3,6 +3,6 @@
   "include": ["vite.config.*", "vitest.config.*", "cypress.config.*"],
   "compilerOptions": {
     "composite": true,
-    "types": ["node", "socket.io-client", "uuid"]
+    "types": ["node", "socket.io-client", "uuid", "element-plus/global"]
   }
 }
