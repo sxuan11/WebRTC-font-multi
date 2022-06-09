@@ -55,17 +55,14 @@ const audioOutputOptions = ref<Array<MediaDeviceInfo>>([]);
 let stream: MediaStream;
 
 function gotDevices(deviceInfos: Array<MediaDeviceInfo>) {
-  for (let i = deviceInfos.length - 1; i >= 0; i--) {
+  for (let i = 0; i <= deviceInfos.length; ++i) {
     const deviceInfo = deviceInfos[i];
     if (deviceInfo.kind === 'audioinput') {
       audioInputOptions.value.push(deviceInfo)
-      audioDevice.value = deviceInfo.deviceId;
     } else if (deviceInfo.kind === 'audiooutput') {
       audioOutputOptions.value.push(deviceInfo)
-      audioOutDevice.value = deviceInfo.deviceId
     } else if (deviceInfo.kind === 'videoinput') {
       videoInputOptions.value.push(deviceInfo)
-      videoDevice.value = deviceInfo.deviceId;
     } else {
       console.log('other kind of source/device: ', deviceInfo);
     }
@@ -97,6 +94,8 @@ const getLocalVideo = async () => {
     }
   });
   localVideo.value.srcObject = stream;
+  videoDevice.value = stream.getVideoTracks()[0].getSettings().deviceId;
+  audioDevice.value = stream.getAudioTracks()[0].getSettings().deviceId;
   localVideo.value.play();
 }
 
