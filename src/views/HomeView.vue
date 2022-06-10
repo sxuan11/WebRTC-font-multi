@@ -3,9 +3,11 @@ import LocalSteam from './localSteam.vue';
 import { io, Socket } from 'socket.io-client';
 import { ref } from 'vue';
 import { v4 as uuid } from 'uuid';
+import { ElMessage } from 'element-plus'
 
 const inputVal = ref('');
 const room = ref('');
+const nick = ref('');
 const userId = ref(uuid())
 const localVideo = ref();
 let stream: MediaStream;
@@ -72,14 +74,19 @@ const initPeer = () => {
 initPeer();
 
 const intoRoom = async () => {
-  // if (!room.value) {
-  //   alert('请输入房间号');
-  //   return;
-  // }
+  if (!room.value) {
+    ElMessage.error('请输入房间号');
+    return;
+  }
+  if (!nick.value) {
+    ElMessage.error('请输入昵称');
+    return;
+  }
   socket = io('http://127.0.0.1:7070', {
     query: {
       room: room.value,
       userId: userId.value,
+      nick: nick.value
     }
   });
   console.log('-> socket', socket);
@@ -155,11 +162,12 @@ const handleIce = async (data: { sdp: RTCIceCandidate, userId: string }) => {
     <span>﹀</span>
   </div>
   <main>
-    <input type="text" v-model="room" placeholder="房间号"/>
-    <button @click="intoRoom">进入房间</button>
+    <el-input type="text" v-model="room" placeholder="房间号"/>
+    <el-input type="text" v-model="nick" placeholder="昵称"/>
+    <el-button @click="intoRoom" type="success">进入房间</el-button>
 
-    <input type="text" v-model="inputVal"/>
-    <button @click="sendMessage">发消息</button>
+    <el-input type="text" v-model="inputVal"/>
+    <el-button @click="sendMessage">发消息</el-button>
   </main>
   <div class="video">
     <video autoplay playsinline ref="localVideo" class="localVideo"></video>

@@ -55,7 +55,7 @@ const audioOutputOptions = ref<Array<MediaDeviceInfo>>([]);
 let stream: MediaStream;
 
 function gotDevices(deviceInfos: Array<MediaDeviceInfo>) {
-  for (let i = 0; i <= deviceInfos.length; ++i) {
+  for (let i = 0; i < deviceInfos.length; i++) {
     const deviceInfo = deviceInfos[i];
     if (deviceInfo.kind === 'audioinput') {
       audioInputOptions.value.push(deviceInfo)
@@ -94,8 +94,8 @@ const getLocalVideo = async () => {
     }
   });
   localVideo.value.srcObject = stream;
-  videoDevice.value = stream.getVideoTracks()[0].getSettings().deviceId;
-  audioDevice.value = stream.getAudioTracks()[0].getSettings().deviceId;
+  videoDevice.value = stream.getVideoTracks()[0].getSettings().deviceId || '';
+  audioDevice.value = stream.getAudioTracks()[0].getSettings().deviceId || '';
   localVideo.value.play();
 }
 
@@ -106,7 +106,7 @@ function attachSinkId(element: HTMLMediaElement, sinkId: string) {
       }).catch((error: Error) => {
         let errorMessage = error;
         if (error.name === 'SecurityError') {
-          errorMessage = `https 打开页面: ${error}`;
+          errorMessage.message = `https 打开页面: ${error.message}`;
         }
         console.error(errorMessage);
       });
@@ -129,7 +129,7 @@ const firstStart = async () => {
   await getLocalVideo()
 }
 
-firstStart()
+// firstStart()
 
 const confirm = () => {
   emit('confirm', stream)
