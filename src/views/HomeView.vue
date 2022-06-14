@@ -66,8 +66,11 @@ const initPeer = () => {
       audio.autoplay = true;
       audio.setAttribute('id', track.track.id)
       idBox.appendChild(audio)
-      audio.play();
     }
+  }
+
+  peerConnect.onconnectionstatechange = ev => {
+    console.log(peerConnect.connectionState, 'onconnectionstatechange');
   }
 }
 
