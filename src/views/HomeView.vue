@@ -1,17 +1,31 @@
 <script setup lang="ts">
 import LocalSteam from './localSteam.vue';
+import axios from "axios";
 import { io, Socket } from 'socket.io-client';
-import { ref } from 'vue';
+import { ref, reactive } from 'vue';
 import { v4 as uuid } from 'uuid';
 import { ElMessage } from 'element-plus'
+
+const instance = axios.create({
+  baseURL: 'http://localhost:7070',
+  timeout: 40000
+})
+
+const isHideTop = ref(false);
+const hideTop = (status: boolean) => {
+  isHideTop.value = status
+}
 
 const inputVal = ref('');
 const room = ref('');
 const nick = ref('');
-const userId = ref(uuid())
+const myUserId = ref(uuid());
+const isAddTrack = ref(false);
+const isJoinRoom = ref(false);
 const localVideo = ref();
-let stream: MediaStream;
-let peerConnect: RTCPeerConnection;
+let userList = ref([])
+let localStream: MediaStream;
+const peerConnectList = new Map();
 
 let socket: Socket;
 
@@ -22,8 +36,8 @@ const sendMessage = () => {
 }
 
 
-const initPeer = () => {
-  peerConnect = new RTCPeerConnection({
+const initPeer = async (creatorUserId: string, recUserId: string) => {
+  const peerConnect = new RTCPeerConnection({
     iceServers: [
       {
         urls: "stun:stun.l.google.com:19302"
@@ -34,20 +48,19 @@ const initPeer = () => {
   peerConnect.onicecandidate = (candidateInfo: RTCPeerConnectionIceEvent) => {
     console.log('-> onicecandidate', candidateInfo);
     if (candidateInfo.candidate) {
-      socket.emit('ICE-candidate', {userId: userId.value, sdp: candidateInfo.candidate}, (res: any) => {
+      socket.emit('ICE-candidate', { creatorUserId, recUserId, sdp: candidateInfo.candidate }, (res: any) => {
         console.log(res);
       })
     }
   }
 
   peerConnect.ontrack = (track: RTCTrackEvent) => {
-    console.log('-> ontrack', track);
     const id = track.streams[0].id;
     const box = document.querySelector('#remoteVideo');
-    let idBox = document.querySelector(`#${id}`)
+    let idBox = document.querySelector(`#PLV${ id }`)
     if (!idBox) {
       const div = document.createElement('div');
-      div.setAttribute('id', id);
+      div.setAttribute('id', `PLV${ id }`);
       box && box.appendChild(div);
       idBox = div;
     }
@@ -72,9 +85,11 @@ const initPeer = () => {
   peerConnect.onconnectionstatechange = ev => {
     console.log(peerConnect.connectionState, 'onconnectionstatechange');
   }
-}
 
-initPeer();
+  peerConnectList.set(`${creatorUserId}_${recUserId}`, peerConnect);
+
+  return peerConnect;
+}
 
 const intoRoom = async () => {
   if (!room.value) {
@@ -85,10 +100,14 @@ const intoRoom = async () => {
     ElMessage.error('请输入昵称');
     return;
   }
+  if(isJoinRoom.value) {
+    ElMessage.error('你已经进入了房间');
+    return;
+  }
   socket = io('http://127.0.0.1:7070', {
     query: {
       room: room.value,
-      userId: userId.value,
+      userId: myUserId.value,
       nick: nick.value
     }
   });
@@ -97,59 +116,110 @@ const intoRoom = async () => {
     console.log(socket.id); //
   });
   handlerEvent();
+  isJoinRoom.value = true;
+
+  setInterval(()=>{
+    instance.get('/userlist', { params: { room: room.value }}).then((res)=>{
+      console.log("=>(HomeView.vue:122) res", res);
+      userList.value = res.data
+      console.log("=>(HomeView.vue:123) userList", userList.value);
+    })
+  }, 1000)
 }
 
 const handlerEvent = () => {
+  socket.on('join', (recUserId: string)=>{
+    someOneLogin(recUserId)
+  })
   socket.on('offer', handleOffer)
+  // socket.on('oneOffer', handleOffer)
   socket.on('answer', handleAnswer)
-  socket.on('ICE-candidate', handleIce)
+  socket.on('ICE-candidate', handleIce);
 }
 
 const gotMediaStream = async (stream: MediaStream) => {
+  if(!isJoinRoom.value) {
+    ElMessage.error('请先加入房间，再确认');
+    return;
+  }
   localVideo.value.srcObject = stream;
+  localStream = stream;
   hideTop(true);
-  await createOffer(stream);
+  const emitList = userList.value.filter((item) => item[0] !== myUserId.value);
+  for (const item of emitList) {
+    const peer = await initPeer(myUserId.value, item[0]);
+    await createOffer(item[0], peer);
+  }
 }
 
-const isHideTop = ref(false);
-const hideTop = (status: boolean) => {
-  isHideTop.value = status
+// 有人登录
+async function someOneLogin(recUserId: string) {
+  if(!localStream) return;
+  const peer = await initPeer(myUserId.value, recUserId);
+  await createOffer(recUserId, peer);
 }
-
 
 // rtcPeer
 
-const createOffer = async (stream: MediaStream) => {
+// 发起方创建offer
+const createOffer = async (recUserId: string, peerConnect: RTCPeerConnection, stream: MediaStream = localStream) => {
+  if (!localStream) return;
   stream.getTracks().forEach((track) => {
     peerConnect.addTrack(track, stream)
   })
   const offer = await peerConnect.createOffer();
+  await peerConnect.setLocalDescription(offer);
   console.log('-> offer', offer);
-  socket.emit('offer', {userId: userId.value, sdp: offer}, (res: any) => {
+  socket.emit('offer', { creatorUserId: myUserId.value, sdp: offer, recUserId }, (res: any) => {
     console.log(res);
   });
-  await peerConnect.setLocalDescription(offer);
 }
 
-const handleOffer = async (offer: { sdp: RTCSessionDescriptionInit, userId: string }) => {
+// 一对一offer
+const createOneOffer = async (loginUserId: string, peerConnect: RTCPeerConnection) => {
+  console.log("=>(HomeView.vue:147) userIds", loginUserId);
+  if (!localStream) return;
+  const offer = await peerConnect.createOffer();
+  await peerConnect.setLocalDescription(offer);
+  console.log('-> oneOffer', offer);
+  socket.emit('oneOffer', { userId: myUserId.value, sdp: offer, loginUserId }, (res: any) => {
+    console.log(res);
+  });
+}
+
+// 发起方offer
+const handleOffer = async (offer: { sdp: RTCSessionDescriptionInit, creatorUserId: string, recUserId: string }) => {
+  const peer = await initPeer(offer.creatorUserId, offer.recUserId);
   console.log('-> handleOffer', offer.sdp);
-  await peerConnect.setRemoteDescription(offer.sdp);
-  const answer = await peerConnect.createAnswer();
+  await peer.setRemoteDescription(offer.sdp);
+  const answer = await peer.createAnswer();
   console.log('-> answer', answer);
-  await peerConnect.setLocalDescription(answer);
-  socket.emit('answer', {userId: userId.value, sdp: answer}, (res: any) => {
+  await peer.setLocalDescription(answer);
+  socket.emit('answer', { recUserId: myUserId.value, sdp: answer, creatorUserId: offer.creatorUserId }, (res: any) => {
     console.log(res);
   })
 }
 
-const handleAnswer = async (data: { sdp: RTCSessionDescriptionInit, userId: string }) => {
+// 应答方回复
+const handleAnswer = async (data: { sdp: RTCSessionDescriptionInit, recUserId: string, creatorUserId: string }) => {
+  const peer = peerConnectList.get(`${data.creatorUserId}_${data.recUserId}`);
   console.log('-> handleAnswer', data);
-  await peerConnect.setRemoteDescription(data.sdp)
+  if (!peer) {
+    console.warn('handleAnswer peer 获取失败')
+    return;
+  }
+  await peer.setRemoteDescription(data.sdp)
 }
 
-const handleIce = async (data: { sdp: RTCIceCandidate, userId: string }) => {
+// ICE候选
+const handleIce = async (data: { sdp: RTCIceCandidate, creatorUserId: string, recUserId: string }) => {
+  const peer = peerConnectList.get(`${data.creatorUserId}_${data.recUserId}`);
   console.log('-> handleIce', data);
-  await peerConnect.addIceCandidate(data.sdp)
+  if (!peer) {
+    console.warn('handleIce peer 获取失败')
+    return;
+  }
+  await peer.addIceCandidate(data.sdp)
 }
 
 </script>
@@ -171,6 +241,13 @@ const handleIce = async (data: { sdp: RTCIceCandidate, userId: string }) => {
 
     <el-input type="text" v-model="inputVal"/>
     <el-button @click="sendMessage">发消息</el-button>
+
+    <div>
+      <span>在线列表</span>
+      <div v-for="(item) of userList" :key="item[0]">
+        <div>{{ item[1].nick }}</div>
+      </div>
+    </div>
   </main>
   <div class="video">
     <video autoplay playsinline ref="localVideo" class="localVideo"></video>
