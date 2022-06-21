@@ -25,6 +25,9 @@ const isJoinRoom = ref(false);
 const localVideo = ref();
 let userList = ref([])
 let localStream: MediaStream;
+let screenStream: MediaStream;
+let blobMedia: (Blob)[] = [];
+let mediaRecord: MediaRecorder
 const peerConnectList = new Map();
 
 let socket: Socket;
@@ -222,6 +225,59 @@ const handleIce = async (data: { sdp: RTCIceCandidate, creatorUserId: string, re
   await peer.addIceCandidate(data.sdp)
 }
 
+
+// ---------------本地屏幕录制-----------------
+
+const startLocalRecord = async  () => {
+  blobMedia = [];
+  screenStream = await navigator.mediaDevices.getDisplayMedia();
+
+  screenStream.getVideoTracks()[0].addEventListener('ended', () => {
+    ElMessage.warning('用户中断了屏幕共享');
+    endLocalRecord()
+  })
+
+  mediaRecord = new MediaRecorder(screenStream, { mimeType: 'video/webm' });
+
+  mediaRecord.ondataavailable = (e) => {
+    if (e.data && e.data.size > 0) {
+      blobMedia.push(e.data);
+    }
+  };
+
+  mediaRecord.start(500)
+}
+
+const endLocalRecord = async () => {
+  if(!mediaRecord || mediaRecord.state !== 'recording') {
+    ElMessage.warning('录制还未开始');
+    return;
+  }
+  mediaRecord.stop();
+  screenStream.getTracks().forEach(track => track.stop());
+}
+
+const replayLocalRecord = async () => {
+  if (blobMedia.length) {
+    const scVideo = document.querySelector('#screenVideo') as HTMLVideoElement;
+    const blob = new Blob(blobMedia, { type:'video/webm' })
+    if(scVideo) {
+       scVideo.src = URL.createObjectURL(blob);
+    }
+  } else {
+    ElMessage.warning('没有录制文件');
+  }
+}
+
+const downloadLocalRecord = async () => {
+  const blob = new Blob(blobMedia, { type: 'video/webm' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '录屏_' + new Date().getTime() + '.webm';
+  a.click();
+}
+
 </script>
 
 <template>
@@ -241,7 +297,10 @@ const handleIce = async (data: { sdp: RTCIceCandidate, creatorUserId: string, re
 
     <el-input type="text" v-model="inputVal"/>
     <el-button @click="sendMessage">发消息</el-button>
-
+    <el-button @click="startLocalRecord">开启本地屏幕录制</el-button>
+    <el-button @click="endLocalRecord" type="danger">结束本地屏幕录制</el-button>
+    <el-button @click="replayLocalRecord" type="info">回放本地屏幕录制</el-button>
+    <el-button @click="downloadLocalRecord" type="success">下载本地屏幕录制</el-button>
     <div>
       <span>在线列表</span>
       <div v-for="(item) of userList" :key="item[0]">
@@ -252,6 +311,9 @@ const handleIce = async (data: { sdp: RTCIceCandidate, creatorUserId: string, re
   <div class="video">
     <video autoplay playsinline ref="localVideo" class="localVideo"></video>
     <div id="remoteVideo"></div>
+    <div>
+      <video autoplay muted id="screenVideo"></video>
+    </div>
   </div>
 </template>
 
