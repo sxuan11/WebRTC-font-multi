@@ -39,6 +39,11 @@ const sendMessage = () => {
 }
 
 
+/**
+ * 创建RTCPeer
+ * @param creatorUserId 创建者id，本人
+ * @param recUserId 接收者id
+ */
 const initPeer = async (creatorUserId: string, recUserId: string) => {
   const peerConnect = new RTCPeerConnection({
     iceServers: [
@@ -230,22 +235,27 @@ const handleIce = async (data: { sdp: RTCIceCandidate, creatorUserId: string, re
 
 const startLocalRecord = async  () => {
   blobMedia = [];
-  screenStream = await navigator.mediaDevices.getDisplayMedia();
 
-  screenStream.getVideoTracks()[0].addEventListener('ended', () => {
-    ElMessage.warning('用户中断了屏幕共享');
-    endLocalRecord()
-  })
+  try {
+    screenStream = await navigator.mediaDevices.getDisplayMedia();
 
-  mediaRecord = new MediaRecorder(screenStream, { mimeType: 'video/webm' });
+    screenStream.getVideoTracks()[0].addEventListener('ended', () => {
+      ElMessage.warning('用户中断了屏幕共享');
+      endLocalRecord()
+    })
 
-  mediaRecord.ondataavailable = (e) => {
-    if (e.data && e.data.size > 0) {
-      blobMedia.push(e.data);
-    }
-  };
+    mediaRecord = new MediaRecorder(screenStream, { mimeType: 'video/webm' });
 
-  mediaRecord.start(500)
+    mediaRecord.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) {
+        blobMedia.push(e.data);
+      }
+    };
+
+    mediaRecord.start(500)
+  } catch (e) {
+    ElMessage.warning(`屏幕共享失败->${e}`);
+  }
 }
 
 const endLocalRecord = async () => {
@@ -270,11 +280,15 @@ const replayLocalRecord = async () => {
 }
 
 const downloadLocalRecord = async () => {
+  if (!blobMedia.length) {
+    ElMessage.warning('没有录制文件');
+    return;
+  }
   const blob = new Blob(blobMedia, { type: 'video/webm' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = '录屏_' + new Date().getTime() + '.webm';
+  a.download = `录屏_${Date.now()}.webm`;
   a.click();
 }
 

@@ -129,7 +129,7 @@ const firstStart = async () => {
   await getLocalVideo()
 }
 
-// firstStart()
+firstStart()
 
 const confirm = () => {
   emit('confirm', stream)
