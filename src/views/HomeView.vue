@@ -7,7 +7,7 @@ import { v4 as uuid } from 'uuid';
 import { ElMessage } from 'element-plus'
 
 const instance = axios.create({
-  baseURL: 'http://localhost:7070',
+  baseURL: 'https://192.160.120.66:7070',
   timeout: 40000
 })
 
@@ -54,6 +54,9 @@ const initPeer = async (creatorUserId: string, recUserId: string) => {
   })
 
   peerConnect.onicecandidate = (candidateInfo: RTCPeerConnectionIceEvent) => {
+    // console.log(peerConnect.connectionState, 'connectionState')
+    // console.log(peerConnect.currentLocalDescription, 'currentLocalDescription')
+    if(!peerConnect.currentRemoteDescription) return;
     console.log('-> onicecandidate', candidateInfo);
     if (candidateInfo.candidate) {
       socket.emit('ICE-candidate', { creatorUserId, recUserId, sdp: candidateInfo.candidate }, (res: any) => {
@@ -112,7 +115,7 @@ const intoRoom = async () => {
     ElMessage.error('你已经进入了房间');
     return;
   }
-  socket = io('http://127.0.0.1:7070', {
+  socket = io('https://192.160.120.66:7070/', {
     query: {
       room: room.value,
       userId: myUserId.value,
@@ -128,9 +131,7 @@ const intoRoom = async () => {
 
   setInterval(()=>{
     instance.get('/userlist', { params: { room: room.value }}).then((res)=>{
-      console.log("=>(HomeView.vue:122) res", res);
       userList.value = res.data
-      console.log("=>(HomeView.vue:123) userList", userList.value);
     })
   }, 1000)
 }
