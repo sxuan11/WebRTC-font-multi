@@ -31,7 +31,7 @@
       </el-select>
     </div>
     <el-button @click="getLocalVideo" type="primary">获取本地预览视频</el-button>
-    <el-button @click="confirm" type="primary">确定当前配置</el-button>
+    <el-button @click="confirm" type="success">以当前配置进行连线</el-button>
   </div>
 </template>
 
@@ -129,7 +129,7 @@ const firstStart = async () => {
   await getLocalVideo()
 }
 
-// firstStart()
+firstStart()
 
 const confirm = () => {
   emit('confirm', stream)
