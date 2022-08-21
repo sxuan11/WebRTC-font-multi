@@ -7,7 +7,7 @@ import { v4 as uuid } from 'uuid';
 import { ElMessage } from 'element-plus'
 
 const instance = axios.create({
-  baseURL: 'http://localhost:7070',
+  baseURL: 'https://114.55.34.57:7070/',
   timeout: 40000
 })
 
@@ -104,7 +104,7 @@ const intoRoom = async () => {
     ElMessage.error('你已经进入了房间');
     return;
   }
-  socket = io('http://127.0.0.1:7070', {
+  socket = io('https://114.55.34.57:7070/', {
     query: {
       room: room.value,
       userId: myUserId.value,
