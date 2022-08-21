@@ -24,7 +24,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'docs',
-    assetsDir: 'WebRTC-font-multi'
+    assetsDir: 'asstes'
   },
   server: {
     https: true
