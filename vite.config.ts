@@ -22,6 +22,10 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     }
   },
+  build: {
+    outDir: 'docs',
+    assetsDir: 'WebRTC-font-multi'
+  },
   server: {
     https: true
   }
