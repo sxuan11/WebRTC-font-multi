@@ -10,6 +10,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { customMediaStream } from "@/views/types";
+
 const video = ref<HTMLVideoElement>();
 const videoStream = ref<MediaStream>()
 const screenStream = ref<MediaStream>()
@@ -18,7 +19,7 @@ const canvasContext = ref<CanvasRenderingContext2D>()
 const isStopDraw = ref(false);
 const videoList = ref<Array<HTMLVideoElement>>([])
 
-const getScreenStream =  async () => {
+const getScreenStream = async () => {
   screenStream.value = await navigator.mediaDevices.getDisplayMedia()
 }
 
@@ -50,7 +51,7 @@ const getMixVideo = async () => {
   await getVideo()
   await startMixScreenAndVideo();
   const stream = canvasEl.value.captureStream();
-  if(video.value) {
+  if (video.value) {
     video.value.srcObject = stream!;
   }
 }
@@ -58,10 +59,10 @@ const getMixVideo = async () => {
 const stopMixVideo = async () => {
   isStopDraw.value = true;
   video.value?.pause();
-  screenStream.value?.getTracks().forEach(t=> {
+  screenStream.value?.getTracks().forEach(t => {
     t.stop();
   })
-  videoStream.value?.getTracks().forEach(t=> {
+  videoStream.value?.getTracks().forEach(t => {
     t.stop();
   })
 }
@@ -76,7 +77,7 @@ const startMixScreenAndVideo = async () => {
 }
 
 const drawToCanvasScreenAndVideo = (screenEl: HTMLVideoElement, videoEl: HTMLVideoElement) => {
-  if(isStopDraw.value) return;
+  if (isStopDraw.value) return;
   canvasContext.value!.drawImage(screenEl, 0, 0, 800, 448);
   canvasContext.value!.drawImage(videoEl, 600, 336, 200, 112);
   setTimeout(drawToCanvasScreenAndVideo.bind(undefined, screenEl, videoEl), 100);
@@ -85,19 +86,59 @@ const drawToCanvasScreenAndVideo = (screenEl: HTMLVideoElement, videoEl: HTMLVid
 // 视频平铺
 const getMixCamera = async () => {
   await getVideo();
-  const streamList: customMediaStream[] = [];
-  for (let i = 0; i < 4; i++) {
-    const stream = handlerStreamCallBack(videoStream.value!, `名字${i+1}`)
-    streamList.push(stream)
+  await getScreenStream();
+  const streamList: HTMLVideoElement[] = [];
+  const screenVideo = genVideo(screenStream.value!)
+  const handlerScreenStream = handlerStreamCallBack(screenStream.value!, '屏幕共享');
+  // @ts-ignore
+  screenVideo['stream'] = handlerScreenStream;
+  streamList.push(screenVideo);
+  for (let i = 0; i < 3; i++) {
+    const name = `名字${i + 1}`;
+    console.log('-> name', name);
+    const handlerStream = handlerStreamCallBack(videoStream.value!, name);
+    const video = genVideo(handlerStream);
+    // @ts-ignore
+    video['stream'] = handlerStream;
+    streamList.push(video)
+  }
+  console.log('-> streamList', streamList);
+  canvasEl.value.width = 800;
+  canvasEl.value.height = 448;
+  canvasContext.value = canvasEl.value.getContext('2d')!;
+  isStopDraw.value = false;
+  startDrawCamera(streamList);
+  const stream = canvasEl.value.captureStream();
+  if (video.value) {
+    video.value.srcObject = stream!;
   }
 }
 
 const handlerStreamCallBack = (stream: MediaStream, text: string) => {
   const streamHandler = videoStream.value! as customMediaStream;
   streamHandler.onDraw = (context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number) => {
-    context.drawImage()
+    context.font = '100px';
+    context.fillStyle = "red";
+    context.fillText(text, x + 50, y + 50)
   }
   return streamHandler;
+}
+
+const startDrawCamera = (streamList: Array<HTMLVideoElement>) => {
+  if (isStopDraw.value) return;
+  streamList.forEach((item, index) => {
+    const width = 800 / 2;
+    const height = 448 / 2;
+    const x = index % 2 ? width : 0;
+    const y = index >= 2 ? height : 0
+    canvasContext.value!.drawImage(item, x, y, width, height);
+    // @ts-ignore
+    if (item.stream && typeof item.stream.onDraw === 'function') {
+      // @ts-ignore
+      item.stream.onDraw(canvasContext.value, x, y, width, height);
+    }
+  })
+  setTimeout(startDrawCamera.bind(undefined, streamList), 100);
 }
 </script>
 
