@@ -20,7 +20,9 @@ const isMicOn = ref(true)
 
 const getVideo = async () => {
   stream.value = await navigator.mediaDevices.getUserMedia({
-    video: true,
+    video: {
+      deviceId: 'e9ae60563d15c7e9df5f8302b94665fac9830287a7792501783b8c01d332ab30'
+    },
     audio: {
       deviceId: 'ec92dd8d23935c459e1190aa8a4c8133f47b1d63a5c0bdd355eb302f313011d2'
     }
