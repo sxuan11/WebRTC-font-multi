@@ -2,15 +2,16 @@
   "name": "vue-project",
   "version": "0.0.0",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "build": "run-p type-check build-only",
-    "preview": "vite preview --port 4173",
+    "preview": "vite preview --host --port 5175",
     "build-only": "vite build",
     "type-check": "vue-tsc --noEmit"
   },
   "dependencies": {
     "axios": "^0.27.2",
-    "element-plus": "^2.2.4",
+    "echarts": "^5.4.2",
+    "element-plus": "^2.3.2",
     "pinia": "^2.0.14",
     "socket.io-client": "^4.5.1",
     "uuid": "^8.3.2",

@@ -1,6 +1,6 @@
 <template>
   <div class="norMal">
-    <video class="previewVideo" ref="localVideo" autoplay playsinline></video>
+    <video class="previewVideo" muted ref="localVideo" autoplay playsinline></video>
     <div class="videoChoose">
       <span>视频源</span>
       <el-select v-model="videoDevice" class="m-2" placeholder="Select" size="large">
@@ -32,6 +32,7 @@
     </div>
     <el-button @click="getLocalVideo" type="primary">获取本地预览视频</el-button>
     <el-button @click="confirm" type="primary">确定当前配置</el-button>
+    <el-button @click="mute" type="primary">mute</el-button>
   </div>
 </template>
 
@@ -43,6 +44,8 @@ const emit = defineEmits<{
 }>()
 const localVideo = ref();
 
+let localStream :MediaStream;
+
 const videoDevice = ref<MediaDeviceInfo["deviceId"]>('');
 const audioDevice = ref<MediaDeviceInfo["deviceId"]>('');
 const audioOutDevice = ref<MediaDeviceInfo["deviceId"]>('');
@@ -53,6 +56,10 @@ const audioOutputOptions = ref<Array<MediaDeviceInfo>>([]);
 
 
 let stream: MediaStream;
+
+const mute = () => {
+  localStream.getVideoTracks()[0].enabled = false;
+}
 
 function gotDevices(deviceInfos: Array<MediaDeviceInfo>) {
   for (let i = 0; i < deviceInfos.length; i++) {
@@ -90,9 +97,11 @@ const getLocalVideo = async () => {
     video: {
       deviceId: videoDevice.value ? { exact: videoDevice.value } : undefined ,
       width: { ideal: 1280 },
-      height: { ideal: 720 }
+      height: { ideal: 720 },
+      frameRate: 35,
     }
   });
+  localStream = stream
   localVideo.value.srcObject = stream;
   videoDevice.value = stream.getVideoTracks()[0].getSettings().deviceId || '';
   audioDevice.value = stream.getAudioTracks()[0].getSettings().deviceId || '';
